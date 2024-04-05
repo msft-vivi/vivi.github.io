@@ -1,0 +1,829 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>StampManager Design Doc | Doc Site </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="StampManager Design Doc | Doc Site ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+  </head>
+
+  <script type="module" src="./../public/docfx.min.js"></script>
+
+  <script>
+    const theme = localStorage.getItem('theme') || 'auto'
+    document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+  </script>
+
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="IndexServe">
+            IndexServe
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled="" placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" style="margin-top: -.65em; margin-left: -.8em" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+
+<ul>
+<li><a href="#stampmanager-design-doc">StampManager Design Doc</a>
+<ul>
+<li><a href="#key-components-design">Key Components Design</a>
+<ul>
+<li><a href="#stampbase">StampBase</a>
+<ul>
+<li><a href="#class-diagram">Class Diagram</a></li>
+</ul>
+</li>
+<li><a href="#stampbaseconfig">StampBaseConfig</a>
+<ul>
+<li><a href="#execution-path">Execution Path</a></li>
+</ul>
+</li>
+<li><a href="#stampcore">StampCore</a></li>
+<li><a href="#commander">Commander</a></li>
+<li><a href="#bond-definition">Bond Definition</a></li>
+<li><a href="#commandexecutor">CommandExecutor</a></li>
+</ul>
+</li>
+<li><a href="#fanout-design">Fanout Design</a></li>
+<li><a href="#how-to-add-metric">How to add metric</a>
+<ul>
+<li><a href="#stampagent-level">StampAgent Level</a></li>
+<li><a href="#machineagent-level">MachineAgent Level</a></li>
+</ul>
+</li>
+<li><a href="#reference">Reference</a></li>
+</ul>
+</li>
+</ul>
+<h1 id="stampmanager-design-doc">StampManager Design Doc</h1>
+<h2 id="key-components-design">Key Components Design</h2>
+<h3 id="stampbase">StampBase</h3>
+<h4 id="class-diagram">Class Diagram</h4>
+<pre><code class="lang-mermaid">classDiagram
+    %% Init housekeeper
+    %% Create command register
+    %% Create and start command receiver
+    %% Create command sender for StampManager/StampAgent/MachineAgent
+    %% Register command sender's client store to housekeeper
+    %% All above are done in StampCore::Initialize()
+
+    note for StampCore &quot;All components are created or initialized in StampCore::Initialize()&quot;
+
+    StampBase--&gt;StampCore: Composition
+    class StampCore{
+        +HouseKeeper m_houseKeeper
+        +StampTimeoutManager m_stampTimeoutManager
+        +StampServicePort m_commandReceiverPort
+        +CommandRegister m_commandRegister
+        +CommandReceiver m_commandReceiver
+        +CommandSender m_commandSenderToStampManager
+        +CommandSender m_commandSenderToStampAgent
+        +CommandSender m_commandSenderToMachineAgent
+
+        +Initialize(IConfiguration) bool
+        +GetHouseKeeper() HouseKeeper
+        +GetStampTimeoutManager() StampTimeoutManager
+        +GetCommandRegister() CommandRegister
+        +GetCommandSender() CommandSender
+    }
+
+    class StampBase{
+        + StampCore m_stampCore
+        + StampServicePort m_port
+
+        + Start() bool
+        + Stop() void
+        + GetCommandRegister() CommandRegister
+        + GetCommandSender() CommandSender
+
+        + static Run() void
+
+        # virtual StartInternal()
+        # virtual StopInternal()
+        # virtual CreateConfigObject() StampConfigBase
+    }
+    class StampManager{
+        StampManagerConfig m_stampManagerConfig
+        StartInternal() bool
+        StopInternal() bool
+        CreateConfigObject() StampConfigBase
+    }
+    class StampAgent{
+        StampAgentConfig m_stampAgentConfig
+        StartInternal() bool
+        StopInternal() bool
+        CreateConfigObject() StampConfigBase
+    }
+    class MachineAgent{
+        MachineAgentConfig m_machineAgentConfig
+        StartInternal() bool
+        StopInternal() bool
+        CreateConfigObject() StampConfigBase
+    }
+
+    StampBase &lt;|-- StampManager
+    StampBase &lt;|-- StampAgent
+    StampBase &lt;|-- MachineAgent
+</code></pre>
+<ul>
+<li><p>Here is <code>Template Method</code> of design pattern, <code>StampBase</code> is a abstract class, <code>StampManager/StampAgent/MachineAgent</code> are concrete class, <code>StampBase</code> defines the skeleton of an algorithm in an operation, and defers some steps to subclasses. <code>StampManager/StampAgent/MachineAgent</code> implement the <code>StartInternal()</code> and <code>StopInternal()</code> methods to carry out specific step.
+then use static method <code>StampBase::Run(StampBase&amp; p_stampBase)</code> to start StampManager/StampAgent/MachineAgent, here p_stampBase is a reference of sub class <code>StampManager/StampAgent/MachineAgent</code></p>
+</li>
+<li><p><code>StampCore</code> is a composition of <code>StampBase</code>, <code>StampCore</code> is responsible for creating and initializing all the components, e.g <code>StampCore::Initialize()</code> is responsible for creating and initializing <code>HouseKeeper</code>, <code>StampTimeoutManager</code>, <code>CommandRegister</code>, <code>CommandReceiver</code>, <code>CommandSender</code> for StampManager/StampAgent/MachineAgent, <code>CommanderReceiver</code> is inherited from <code>StampCommandHandler_Service</code> which is a <code>bond::Service</code>, when <code>CommanderReceiver</code> was initialized, the bond server started to listen on <code>StampServicePort</code> port, then <code>CommanderReceiver</code> will receive command from StampManager/StampAgent/MachineAgent, then deserialize it to <code>StampCommand</code> object, then dispatch it to <code>CommandRegister</code> to execute its <code>Execute()</code> method based on its <code>bondClassName</code> field.</p>
+</li>
+</ul>
+<h3 id="stampbaseconfig">StampBaseConfig</h3>
+<pre><code class="lang-mermaid">classDiagram
+    StampConfigBase &lt;|-- StampManagerConfig
+    StampConfigBase &lt;|-- StampAgentConfig
+    StampConfigBase &lt;|-- MachineAgentConfig
+
+    class StampConfigBase{
+        + virtual Initialize(IConfiguration) bool
+    }
+    class StampManagerConfig{
+        - vector&lt;ServiceGroup&gt; m_serviceGroups
+        + Initialize(IConfiguration) bool
+    }
+    class StampAgentConfig{
+        - string m_stampManagerMF
+        - vector&lt;string&gt; m_stampManagerEnvList
+        - StampAgent* m_stampAgent
+        - MachineList m_machineList
+        - StampAgentPeriodTaskManager m_stampAgentPeriodTaskManager
+        + Initialize(IConfiguration) bool
+    }
+    class MachineAgentConfig{
+        - MachineAgent* m_machineAgent
+        - string m_stampAgentMachineFunction
+        - MachineAgentPeriodTaskManager m_machineAgentPeriodTaskManager
+        + Initialize(IConfiguration) bool
+    }
+</code></pre>
+<ul>
+<li><code>CreateConfigObject()</code> is called by <code>StampBase::Initialize()</code> to create config object for StampManager/StampAgent/MachineAgent, each derived class should implement its own <code>CreateConfigObject()</code> method based on its config class, then call <code>Initialize()</code> method of its config class to initialize its config object, e.g <code>m_stampManagerConfig.Initialize(config)</code></li>
+</ul>
+<h4 id="execution-path">Execution Path</h4>
+<ul>
+<li><p><code>StartInternal()</code> and <code>StopInternal()</code> are called by <code>StampBase::Start()</code> and <code>StampBase::Stop()</code> respectively but implemented in derived class (StampManager/StampAgent/MachineAgent)</p>
+<pre><code class="lang-c++">// SubClass is one of StampManager/StampAgent/MachineAgent
+main()
+    SubClass subClass;
+    StampBase:
+        Run(subclass)
+            Start()
+                Initialize()
+                    StampConfigBase:
+                        CreateConfigObject()
+                        Initialize()
+                            RegisterCleanupCallback()
+                            CreatePeriodTaskManager()
+                                PeriodTaskManager:
+                                    Initialize()
+                                        ConcretePeriodTask:
+                                            Initialize()
+                                                InitializeInternal() // Implemented in each concrete period task.
+                                                    PeriodTask::InitializeCommand() // LogLookupTaskCommand is registered to CommandRegister here.
+                                                        RegisterCommand()
+                    StampCore:
+                        CreateStampCore()
+                        Initialize()
+                            CreateCommandRegister()
+                            CreateCommandReceiver() // Bond server started to listen on StampServicePort port here.
+                            CreateCommandSender()
+                StartInternal() // MA/SA/SM implements StartInternal() method.
+                    StartPeriodTask()
+            Stop()
+                StopInternal()
+                    StopPeriodTask()
+</code></pre>
+</li>
+</ul>
+<h3 id="stampcore">StampCore</h3>
+<p><code>StampCore</code> is a composition of <code>StampBase</code>, <code>StampCore</code> is responsible for creating and initializing all the core components, e.g <code>StampCore::Initialize()</code> is responsible for creating and initializing <code>HouseKeeper</code>, <code>StampTimeoutManager</code>, <code>CommandRegister</code>, <code>CommandReceiver</code>, <code>CommandSender</code> for StampManager/StampAgent/MachineAgent.</p>
+<h3 id="commander">Commander</h3>
+<ul>
+<li><p>Kind of Command</p>
+<ul>
+<li>CommandReceiver
+<ul>
+<li>Implement service StampCommandHandler defined in <code>StampCommand.bond</code></li>
+</ul>
+</li>
+<li>CommandRegister
+<ul>
+<li>Register command to CommandExecuterMap</li>
+<li>Dispatch command to execute its <code>Execute()</code> method</li>
+</ul>
+</li>
+<li>CommandSender
+<ul>
+<li>Responsible for sending command to StampManager/StampAgent/MachineAgent</li>
+<li>Mainly include <code>Send_Sync</code> and <code>Send_Async</code> methods</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>How command is sent and received</p>
+<ul>
+<li><p>StampManager intends to support many kinds of request type, such as <code>GetLogByTraceId</code>, <code>MachineDataRetrieve</code>. Generally, for different request types we have two options to deal with:</p>
+<ul>
+<li><p>Option1: Create different service interface for different request type, e.g <code>GetLogByTraceIdService</code>, <code>MachineDataRetrieveService</code>, then register it to <code>bond::Service</code> with different port binding.</p>
+</li>
+<li><p>Option2: Create a generic service interface <code>StampCommandHandler</code> for all request types, which only exposes one RPC service interface <code>void Execute(StampCommand, StampCommandResponse)</code>, then use <code>bondClassName</code> to identify request type. Different requests are unified to <code>StampCommand</code> object, when <code>ConmmandReceiver</code> received a <code>StampCommand</code>, it then deserialize it to concrete request object, a <code>CommandObject</code>, based on its <code>bondClassName</code> field.</p>
+</li>
+</ul>
+<p>For StampManager, it choose Option2.</p>
+</li>
+<li><p>Before Sending request to service, each request, e.g <code>GetLogByTraceIdCommand</code> is wrapped into a <code>CommandObject</code> object, then serialized this <code>CommandObject</code> to <code>bond::blob</code> object, which will be stored in <code>StampCommand</code> object, then send this <code>StampCommand</code> object to service. When service received this <code>StampCommand</code> object, it will deserialize it to <code>CommandObject</code> object with the passed <code>bond::blob</code>. Different commands are register to <code>CommandRegister</code> at initliazation phase, then <code>CommandRegister</code> will dispatch this <code>CommandObject</code> to its <code>Execute()</code> method based on its <code>bondClassName</code> field.</p>
+<ul>
+<li><p>Using filed <code>bondClassName</code> to identify command type, serialize CommandObject to <code>bond::blob</code> before send (CommandSender), then deserialize to concrete command object when received (CommanderReceiver)</p>
+</li>
+<li><p>CommandObject store request data (traceId, request stamp endpoint)</p>
+</li>
+<li><p>CommandObject is sent to StampManager at first, then forward to StampAgent, then forward to MachineAgent, all necessary information is stored in CommandObject</p>
+<pre><code class="lang-c++">// CommandSender: serialize CommandObject to blob, then wrap it into StampCommand (request) before send.
+CommandSender::Send_Async(
+    std::string&amp; p_ipAddress,
+    const appfun::CommandObject&amp; p_command,
+    const boost::function&lt;void (const boost::shared_ptr&lt;appfun::CommandObject&gt;&amp;)&gt;&amp; p_callback)
+{
+    bond::SocketAddress address(p_ipAddress.c_str(), static_cast&lt;UInt16&gt;(m_port));
+
+    boost::shared_ptr&lt;StampCommandHandler_Proxy&gt; stampCommandHandlerProxy =
+        boost::make_shared&lt;StampCommandHandler_Proxy&gt;(m_clientStore-&gt;GetClient(address),
+                                                        bond::COMPACT_PROTOCOL);
+
+    stampCommandHandlerProxy-&gt;EnableCompression(m_encodingType);
+
+    // Prepare request.
+    StampCommand stampCommand;
+    stampCommand.m_bondClassName = p_command.GetBondClassName();
+    stampCommand.m_senderIdentifier = 0;
+    stampCommand.m_dataBlob = p_command.Serialize();
+
+    // ASync call.
+    stampCommandHandlerProxy-&gt;Execute(stampCommand,
+                                    HandleAsyncCommandCallback(p_response, p_callback, address));
+}
+
+// CommandReceiver: deserialize StampCommand (request) to get reql CommandObject,
+// then invoke its Execute() method based on its bondClassName field from CommandRegister.
+// CommandReceiver::Execute() is RPC service interface implementation.
+CommandReceiver::Execute(
+    const bond::message&lt;StampCommand&gt;&amp; input,
+    const boost::function&lt;void (const bond::message&lt;StampCommandResponse&amp;&gt;&amp;)&gt;&amp; callback)
+{
+    // Retrieve request data.
+    StampCommand stampCommand;
+    input.payload().Deserialize(stampCommand);
+
+    boost::shared_ptr&lt;appfun::CommandObject&gt; command(CommandObjectFactory::CreateCommandObject(stampCommand.m_bondClassName));
+    boost::scoped_ptr&lt;appfun::CommandObject&gt; commandResponse;
+    command-&gt;DeSerialize(stampCommand.m_dataBlob);
+
+    // CommandRegister has registered all the commands at initialization phase, typically in StartPeriodTask -&gt; PeriodTask::InitializeCommand
+    CommandResponseDispatchStatus dispatchStatus =
+        m_commandRegister.Invoke(stampCommand.m_bondClassName,
+                                    command,
+                                    commandResponse,
+                                    boost::bind(CommandReceiver::SendResponse,
+                                                stampCommand.m_senderIdentifier,
+                                                startTime,
+                                                callback,
+                                                _1));
+}
+</code></pre>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="bond-definition">Bond Definition</h3>
+<ul>
+<li><p>Request and Response</p>
+<pre><code class="lang-c++">struct StampCommand
+{
+    1: string m_bondClassName;
+    2: UInt32 m_senderIdentifier;
+    3: blob m_dataBlob;
+};
+
+struct StampCommandResponse
+{
+    1: string m_bondClassName;
+    2: UInt32 m_senderIdentifier;
+    3: blob m_dataBlob;
+};
+</code></pre>
+</li>
+<li><p>Service Interface</p>
+<pre><code class="lang-c++">service StampCommandHandler
+{
+    StampCommandResponse Execute(StampCommand);
+};
+</code></pre>
+</li>
+<li><p>Life Time of Bond Request and CommandObject</p>
+<ul>
+<li><p>Build bond request from CommandObject: a command object is wrapped in bond request <code>StampCommand</code> as a <code>bond::blob</code> object before sending to StampManager/StampAgent/MachineAgent</p>
+</li>
+<li><p>Send bond request: bond request is sent to StampManager/StampAgent/MachineAgent with <code>CommandSender::Send_Sync</code> or <code>CommandSender::Send_Async</code></p>
+</li>
+<li><p>Parse command from request: get <code>bondClassName</code> from <code>StampCommand</code>, then deserialize <code>StampCommand</code>s <code>bond::blob</code> field to get concrete <code>CommandObject</code>.</p>
+<pre><code class="lang-c++">// Retrieve request data.
+StampCommand stampCommand;
+input.payload().Deserialize(stampCommand);
+
+// Create a command object based on its bondClassName field.
+boost::shared_ptr&lt;appfun::CommandObject&gt; command(CommandObjectFactory::CreateCommandObject(stampCommand.m_bondClassName));
+boost::scoped_ptr&lt;appfun::CommandObject&gt; commandResponse;
+
+// Deserialize request data to command object.
+// Different command object has different Deserialize method.
+command-&gt;DeSerialize(stampCommand.m_dataBlob);
+</code></pre>
+</li>
+<li><p>Dispatch command object: a command object is dispatched to its <code>Execute()</code> method</p>
+</li>
+<li><p>Execute command object: a command object is executed its <code>Execute()</code> method</p>
+<pre><code class="lang-c++">// Under CommanderRegister
+CommandResponseDispatchStatus
+CommandRegister::Invoke(const std::string&amp; p_commandBondClassName,
+                    boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; p_command,
+                    boost::scoped_ptr&lt;appfun::CommandObject&gt;&amp; p_commandResponse,
+                    const SendResponseCallbackFunction&amp; p_sendResponseCallback) const
+{
+    CommandExecuterMap::const_iterator iter = m_commandExecuterMap.find(p_commandBondClassName);
+    if (iter != m_commandExecuterMap.end())
+    {
+        return iter-&gt;second-&gt;Execute(p_command, p_commandResponse, p_sendResponseCallback);
+    }
+    // Do other things
+}
+</code></pre>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="commandexecutor">CommandExecutor</h3>
+<pre><code class="lang-mermaid">classDiagram
+    CommandExecutor &lt;|-- LogLookupCommand 
+    CommandExecutor &lt;|-- MachineDataRetrieveCommand
+    StampAgentPeriodTask &lt;|-- StampLogLookupTask
+    LogLookupCommand &lt;|-- StampLogLookupTask
+    PeriodTask &lt;|-- StampAgentPeriodTask
+
+    class CommandExecutor{
+        virtual Execute(CommandObject, CommandObject, SendResponseCallbackFunction) CommandResponseDispatchStatus
+    }
+    class LogLookupCommand{
+        -FanOutAndAggregation m_fanOutAndAggregation
+        +InitializeCommand(CommandSender&amp; p_commandSender,CommandRegister&amp; p_commandRegister,StampTimeoutManager&amp; p_stampTimeoutManager) bool
+        +Execute(CommandObject, CommandObject, SendResponseCallbackFunction) CommandResponseDispatchStatus
+        +GetLogByTraceIDAggregationCallback(SendResponseCallbackFunction,vector~CommandObject~)
+        +virtual GetDestinationIPAddresses();
+    }
+    class MachineDataRetrieveCommand{
+        +InitializeCommand(CommandSender&amp; p_commandSender,CommandRegister&amp; p_commandRegister,StampTimeoutManager&amp; p_stampTimeoutManager) bool
+        +Execute(CommandObject, CommandObject, SendResponseCallbackFunction) CommandResponseDispatchStatus
+        +AggregationCallback(SendResponseCallbackFunction,vector~CommandObject~)
+        +virtual GetDestinationIPAddresses();
+    }
+    %% StampLogLookupTask is intend for a command, so it DoWork() is do nothing.
+    class StampLogLookupTask{
+        # DoWork() void
+        # InitializeInternal()
+        # GetDestinationIPAddresses()
+    }
+</code></pre>
+<h2 id="fanout-design">Fanout Design</h2>
+<ul>
+<li><p>Call Path</p>
+<pre><code class="lang-mermaid">%% flowchart TD
+flowchart LR
+StampManagerLogLookupTask--&gt;RegisterCommand --&gt; InitializeCommand
+
+BuildCommand--&gt;CommandSender
+CommandSender--&gt;CommandReceiver
+CommandReceiver--&gt;ParseCommand
+ParseCommand--&gt;DispatchCommand
+DispatchCommand--&gt;Execute
+Execute--&gt;FanOut
+FanOut--&gt;Send_Async
+Send_Async--&gt;HandleAsyncSingleCommandCallback
+HandleAsyncSingleCommandCallback--&gt;AddResponseAndMaybeDispatch
+AddResponseAndMaybeDispatch--&gt;FanOutComplete
+Send_Async--&gt;FanOutTimeOut
+FanOutTimeOut--&gt;FanOutComplete
+FanOutComplete--&gt;AggregationCallback
+AggregationCallback--&gt;SendResponseCallback
+</code></pre>
+</li>
+<li><p>Class Diagram</p>
+<pre><code class="lang-mermaid">classDiagram
+    class LogLookupCommand{
+        - FanOutAndAggregation m_fanOutAndAggregation
+        + InitializeCommand(CommandSender&amp; p_commandSender,CommandRegister&amp; p_commandRegister,StampTimeoutManager&amp; p_stampTimeoutManager) bool
+        + Execute(CommandObject, CommandObject, SendResponseCallbackFunction) CommandResponseDispatchStatus
+        + GetLogByTraceIDAggregationCallback(SendResponseCallbackFunction,vector~CommandObject~)
+        + virtual GetDestinationIPAddresses()
+    }
+</code></pre>
+</li>
+<li><p>Register Command (Execute in PeriodTask)</p>
+<pre><code class="lang-c++">bool
+LogLookupCommand::InitializeCommand(apsdk::Ptr&lt;const IConfiguration&gt;&amp; p_config,
+                                    const char* p_section,
+                                    CommandSender&amp; p_commandSender,
+                                    CommandRegister&amp; p_commandRegister,
+                                    StampTimeoutManager&amp; p_stampTimeoutManager)
+{
+    // Register as a command receiver, so that could receive commands from StampManager.
+    p_commandRegister.RegistCommand(CommandObjectType&lt;GetLogByTraceIDCommand&gt;::GetName(),
+                                    this);
+
+    m_fanOutAndAggregation.reset(new FanOutAndAggregation(p_commandSender,
+                                                          p_stampTimeoutManager,
+                                                          responseTimeoutInMS));
+}
+</code></pre>
+</li>
+<li><p>Core Get Log Logic (Invoke in Execute)</p>
+<pre><code class="lang-c++">void
+LogLookupCommand::ExecuteGetLogByTraceIDCommand(
+    boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; p_command,
+    const SendResponseCallbackFunction&amp; p_sendResponseCallback)
+{
+    // We are expecting GetLogByTraceIDCommand.
+    GetLogByTraceIDCommand&amp; getLogByTraceIDCommand =
+        TemplateUtility::GetInternalObject&lt;GetLogByTraceIDCommand&gt;(*p_command);
+
+    // Get Fanout ipaddress.
+    std::vector&lt;std::string&gt; fanOutMachineIpAddresses;
+    GetDestinationIPAddresses(getLogByTraceIDCommand.m_endPoint, fanOutMachineIpAddresses, getLogByTraceIDCommand.m_traceID);
+
+    // Fanout.
+    m_fanOutAndAggregation-&gt;FanOut(fanOutMachineIpAddresses,
+                                    p_command,
+                                    boost::bind(&amp;LogLookupCommand::GetLogByTraceIDAggregationCallback,
+                                                this,
+                                                p_sendResponseCallback,
+                                                getLogByTraceIDCommand.m_traceID,
+                                                _1),
+                                    m_reissueCount,
+                                    m_stopReissueRemainingCount);
+}
+</code></pre>
+</li>
+<li><p>Fanout Core</p>
+<pre><code class="lang-c++">void
+FanOutAndAggregation::FanOut(std::vector&lt;std::string&gt;&amp; p_fanOutMachineIpAddresses,
+                             boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; p_command,
+                             const AggregateCallbackFunction&amp; p_aggregateCallbackFunction,
+                             UInt32 p_reissueCount,
+                             UInt32 p_stopReissueRemainingCount)
+{
+    boost::weak_ptr&lt;ResponseContainer&gt; weakResponseContainer;
+
+    boost::shared_ptr&lt;ResponseContainer&gt; responseContainer(
+        new ResponseContainer(p_reissueCount,
+                              p_aggregateCallbackFunction,
+                              *this,
+                              p_fanOutMachineIpAddresses,
+                              p_command,
+                              p_stopReissueRemainingCount));
+
+    responseContainer-&gt;SelfContain();
+
+    weakResponseContainer = responseContainer;
+
+    BOOST_FOREACH (std::string&amp; ipAddress, p_fanOutMachineIpAddresses)
+    {
+        m_commandSender.Send_Async(ipAddress,
+                                   *p_command,
+                                   boost::bind(&amp;FanOutAndAggregation::HandleAsyncSingleCommandCallback,
+                                               weakResponseContainer,
+                                               ipAddress,
+                                               _1));
+    }
+}
+
+// Single response handler.
+void
+FanOutAndAggregation::HandleAsyncSingleCommandCallback(
+    boost::weak_ptr&lt;ResponseContainer&gt; p_weakResponseContainer,
+    const std::string&amp; p_ipAddress,
+    const boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; p_commandResponse)
+{
+    boost::shared_ptr&lt;ResponseContainer&gt; responseContainer = p_weakResponseContainer.lock();
+
+    responseContainer-&gt;AddResponseAndMaybeDispatch(p_ipAddress, p_commandResponse);
+}
+
+void
+ResponseContainer::AddResponseAndMaybeDispatch(
+    const std::string&amp; p_ipAddress,
+    const boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; p_commandResponse)
+{
+    // ignore empty response.
+    if (p_commandResponse == nullptr)
+    {
+        return;
+    }
+
+    // lookup fanout entry.
+    auto it = m_fanOutEntries.find(p_ipAddress);
+
+    if (it == m_fanOutEntries.end())
+    {
+        return;
+    }
+
+    // This is the first time to receive response.
+    if (it-&gt;second.Increment() == 1)
+    {
+        UInt32 currentResponseCount = m_responsesCount.Increment();
+        // add response.
+        boost::atomic_store(&amp;m_commandResponses[currentResponseCount - 1],
+                            p_commandResponse);
+
+        // Ready to dispatch.
+        if (currentResponseCount == static_cast&lt;UInt32&gt;(m_fanOutEntries.size()))
+        {
+            FanOutComplete();
+        }
+    }
+}
+
+// Fanout complete.
+ResponseContainer::FanOutComplete()
+{
+    if (0 == ::InterlockedDecrement(&amp;m_cleanupRefCount))
+    {
+        bool reissue = false;
+        std::vector&lt;std::string&gt; reissueIPAddress;
+        string_stream remainingIPAddressString;
+
+        UInt32 currentResponseCount = m_responsesCount.Value();
+        UInt32 totalRequestedCount = static_cast&lt;UInt32&gt;(m_fanOutEntries.size());
+
+        // Reissue logic.
+        // xxx
+
+        // Copy a response copy (they are all just pointers, and shrimp to the real size.)
+        std::vector&lt;boost::shared_ptr&lt;appfun::CommandObject&gt;&gt; commandResponses;
+        commandResponses.reserve(currentResponseCount);
+        for (UInt32 i = 0; i &lt; currentResponseCount; ++i)
+        {
+            commandResponses.push_back(m_commandResponses[i]);
+        }
+
+        // call back aggregation.
+        m_aggregateCallbackFunction(commandResponses);
+
+        // Cleanup.
+        m_shared_from_this.reset();
+    }
+}
+</code></pre>
+</li>
+<li><p>AggregationCallback</p>
+<pre><code class="lang-c++">void
+LogLookupCommand::GetLogByTraceIDAggregationCallback(
+    const SendResponseCallbackFunction&amp; p_sendResponseCallback,
+    const std::string&amp; p_traceID,
+    const std::vector&lt;boost::shared_ptr&lt;appfun::CommandObject&gt;&gt;&amp; p_commandResponses)
+{
+    boost::scoped_ptr&lt;appfun::CommandObject&gt; commandResponse;
+    GetLogByTraceIDCommandResponse&amp; getLogByTraceIDCommandResponse =
+        CommandObjectFactory::CreateCommandObject&lt;GetLogByTraceIDCommandResponse&gt;(commandResponse);
+
+    // go through all the response.
+    // dedup logic.
+    std::set&lt;std::string&gt; dedupSet;
+    BOOST_FOREACH(const boost::shared_ptr&lt;appfun::CommandObject&gt;&amp; machineAgentCommandResponse, p_commandResponses)
+    {
+        // ignore null response.
+        if (machineAgentCommandResponse == nullptr)
+        {
+            continue;
+        }
+
+        // Get response from machine agent.
+        GetLogByTraceIDCommandResponse&amp; machineAgentGetLogByTraceIDCommandResponse =
+            TemplateUtility::GetInternalObject&lt;GetLogByTraceIDCommandResponse&gt;(*machineAgentCommandResponse);
+
+        // push all the logs getting from machine agent into the response.
+        BOOST_FOREACH(GetLogByTraceIDCommandEntry&amp; entry, machineAgentGetLogByTraceIDCommandResponse.m_entries)
+        {
+            std::string dedupEntry = entry.m_log;
+            dedupEntry += entry.m_commandResponseEndPoint.m_stamp + entry.m_commandResponseEndPoint.m_machine;
+
+            auto iter = dedupSet.find(dedupEntry);
+            if (iter == dedupSet.end())
+            {
+                dedupSet.insert(dedupEntry);
+
+                if (m_sort)
+                {
+                    entry.m_sortHint = ExtractTimeStamp(entry.m_log);
+                }
+
+                getLogByTraceIDCommandResponse.m_entries.push_back(entry);
+            }
+        }
+    }
+    // dispatch.
+    p_sendResponseCallback(commandResponse.get());
+}
+</code></pre>
+</li>
+<li><p>Service level Response</p>
+<pre><code class="lang-c++">CommandReceiver::SendResponse(
+    UInt32 p_senderIdentifier,
+    const boost::function&lt;void (const bond::message&lt;StampCommandResponse&amp;&gt;&amp;)&gt;&amp; p_callback,
+    appfun::CommandObject* p_commandResponse)
+{
+    StampCommandResponse stampCommondResponse;
+    stampCommondResponse.m_bondClassName = p_commandResponse-&gt;GetBondClassName();
+    // Store CommandObject to blob.
+    stampCommondResponse.m_dataBlob = p_commandResponse-&gt;Serialize();
+    stampCommondResponse.m_senderIdentifier = p_senderIdentifier;
+    // dispatch.
+    p_callback(stampCommondResponse);
+}
+</code></pre>
+</li>
+</ul>
+<h2 id="how-to-add-metric">How to add metric</h2>
+<h3 id="stampagent-level">StampAgent Level</h3>
+<ul>
+<li><p>StampManagerLogLookupTask</p>
+<ul>
+<li><p>Add member std::unordered_map&lt;string, string&gt; IP2StampAgentMap;</p>
+</li>
+<li><p>Build IP2StampAgentMap after GetDestinationIPAddress</p>
+<pre><code class="lang-c++">StampManagerLogLookupTask::GetDestinationIPAddresses(
+    const StampRespEndPoint&amp; p_stampRespEndPoint,
+    std::vector&lt;std::string&gt;&amp; p_ipAddresses,
+    const std::string&amp; p_traceID)
+{
+    DebugLogAssert(m_serviceGroup != NULL);
+    StampManagerCommandDestinationHelper::GetDestinationIPAddresses(
+        *m_serviceGroup,
+        p_stampRespEndPoint,
+        p_ipAddresses,
+        m_useOnlineStampOnly);
+
+    // TODO: Build IP2StampAgentMap with filled p_ipAddress;
+}
+</code></pre>
+</li>
+</ul>
+</li>
+<li><p>FanOutAndAggregation.cpp</p>
+<ul>
+<li><p>Option1: Add a weak_ptr to LogLookupCommand (StampManagerLookUpTask extends from LogLookupCommand), thus we can access IP2StampAgentMap from FanoutAndAggregation</p>
+</li>
+<li><p>Option2: Add a new interface which accepts IP2StampAgentMap as params</p>
+</li>
+<li><p>ResponseContainer.cpp</p>
+<ul>
+<li><p>Add member std::vector&lt;std::string&gt; respondedStampAgentList to ResponseContainer</p>
+</li>
+<li><p>In AddResponseAndMaybeDispatch:</p>
+<ul>
+<li>Once a new valid ipAddress respond, query IP2StampAgentMap, add corresponding StampAgent name to the returned StampAgent set.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Log or metric responded StampAgent in FanOutComplete method (After reissue method)</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="machineagent-level">MachineAgent Level</h3>
+<ul>
+<li><p>StampLogLookupTask</p>
+<ul>
+<li><p>Add member std::unordered_map&lt;string, string&gt; IP2MachineAgentMap;</p>
+</li>
+<li><p>Build IP2MachineAgentMap after GetDestinationIPAddress</p>
+<pre><code class="lang-c++">void StampLogLookupTask::GetDestinationIPAddresses(
+    const StampRespEndPoint&amp; p_stampRespEndPoint,
+    std::vector&lt;std::string&gt;&amp; p_ipAddresses,
+    const std::string&amp; p_traceID)
+{
+    StampAgentCommandDestinationHelper::GetDestinationIPAddresses(
+        *m_stampAgent,
+        p_stampRespEndPoint,
+        p_ipAddresses);
+
+    // TODO: Build IP2MachineAgentMap with filled p_ipAddress;
+}
+</code></pre>
+</li>
+</ul>
+</li>
+<li><p>FanOutAndAggregation</p>
+<ul>
+<li>Similar to StampAgent Level</li>
+</ul>
+</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><a href="https://msasg.visualstudio.com/DefaultCollection/Bing_and_IPG/_git/IndexServe/pullrequest/4123091">Add MDM counter to record rpc call latency and QPS for StampManager</a></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
